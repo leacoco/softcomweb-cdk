@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${0}")"; pwd -P)"
+
+export CDK_CLI_VERSION="${CDK_CLI_VERSION:-1.93.0}"
+export CDK_NEW_BOOTSTRAP=1
+export CDK_BOOTSTRAP_STACK="${CDK_BOOTSTRAP_STACK:-CDKToolkit}"
+export CDK_BOOTSTRAP_QUALIFIER="${CDK_BOOTSTRAP_QUALIFIER:-hnb659fds}"
+
+if [ "${CDK_BOOTSTRAP_QUALIFIER}" != "hnb659fds" ]; then
+  CDK_BOOTSTRAP_STACK="${CDK_BOOTSTRAP_STACK}-${CDK_BOOTSTRAP_QUALIFIER}"
+fi
+
+export AWS_ACCOUNT_CURRENT=`aws sts get-caller-identity --query 'Account' --output text`
+export AWS_BOOTSTRAP_REGIONS="eu-central-1 eu-west-1"
+export AWS_BOOTSTRAP_ENVIRONMENTS=""
+
+for region in $AWS_BOOTSTRAP_REGIONS; do
+  AWS_BOOTSTRAP_ENVIRONMENTS="$AWS_BOOTSTRAP_ENVIRONMENTS aws://${AWS_ACCOUNT_CURRENT}/${region}"
+done
+
+read -p "Are you sure you want to teardown the following environments from [${CDK_BOOTSTRAP_STACK}]: [${AWS_BOOTSTRAP_ENVIRONMENTS}] (Type 'Yes')" -n 3 -r
+echo
+if [[ $REPLY =~ ^Yes$ ]]; then
+
+  for region in ${AWS_BOOTSTRAP_REGIONS}; do
+      cdk_bootstrap_bucket="cdk-${CDK_BOOTSTRAP_QUALIFIER}-assets-${AWS_ACCOUNT_CURRENT}-${region}"
+      cdk_bootstrap_ecr_repo="cdk-${CDK_BOOTSTRAP_QUALIFIER}-container-assets-${AWS_ACCOUNT_CURRENT}-${region}"
+
+      echo "[INFO] tearing down cdk bootstrap in region [${region}]"
+
+      echo "[INFO] cleaning s3 bucket [${cdk_bootstrap_bucket}]"
+
+      python -c "import boto3; s3 = boto3.resource('s3', region_name='${region}'); bucket = s3.Bucket('${cdk_bootstrap_bucket}'); bucket.object_versions.all().delete(); bucket.delete()" || true
+
+      echo "[INFO] cleaning ecr repo [${cdk_bootstrap_ecr_repo}]"
+
+      aws ecr delete-repository \
+          --region $region \
+          --repository-name ${cdk_bootstrap_ecr_repo} \
+          --force || true
+
+      echo "[INFO] removing stack [${CDK_BOOTSTRAP_STACK}]"
+
+      aws cloudformation delete-stack \
+          --region ${region} \
+          --stack-name ${CDK_BOOTSTRAP_STACK}
+  done
+else
+  echo "[ERROR] Invalid answer [$REPLY]"
+fi
