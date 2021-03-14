@@ -72,7 +72,7 @@ def deploy_cdk(account, aws_region, infra_account_id):
     env=my_env,
     universal_newlines=True
   )
-
+  print("Done")
 
 
 account = select_account()
