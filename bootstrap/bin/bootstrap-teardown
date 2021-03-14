@@ -50,4 +50,5 @@ if [[ $REPLY =~ ^Yes$ ]]; then
   done
 else
   echo "[ERROR] Invalid answer [$REPLY]"
+  exit 1
 fi
