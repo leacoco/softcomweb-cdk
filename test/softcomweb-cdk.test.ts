@@ -5,7 +5,10 @@ import * as SoftcomwebCdk from '../lib/softcomweb-cdk-stack';
 test('Empty Stack', () => {
     const app = new cdk.App();
     // WHEN
-    const stack = new SoftcomwebCdk.SoftcomwebCdkStack(app, 'MyTestStack');
+    const stack = new SoftcomwebCdk.SoftcomwebCdkStack(app, 'MyTestStack', {
+      bucketName: "test-bucket",
+      bucketVersioning: false
+    });
     // THEN
     expectCDK(stack).to(matchTemplate({
       "Resources": {}
